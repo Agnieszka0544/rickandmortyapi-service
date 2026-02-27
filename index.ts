@@ -1,11 +1,61 @@
-const express = require("express");
+import express from 'express';
+import {Request, Response} from 'express';
 
 const app = express();
 const port = 3000;
 
 const BASE_URL = "https://rickandmortyapi.com/api";
 
-async function searchResource(resourceType, searchTerm) {
+interface Character {
+  id: number,
+  name: string,
+  type: string,
+  url: string,
+  episode: string[]
+}
+
+interface Location {
+  id: number;
+  name: string;
+  type: string;
+  url: string;
+}
+
+interface Episode {
+  name: string,
+  type: string,
+  url: string
+}
+
+interface SearchResult {
+  name: string;
+  type: 'character' | 'location' | 'episode';
+  url: string;
+}
+
+interface CharacterPair {
+  character1: {
+    name: string;
+    url: string;
+  };
+  character2: {
+    name: string;
+    url: string;
+  };
+  episodes: number;
+}
+
+interface ApiResponse<T> {
+  info: {
+    count: number;
+    pages: number;
+    next: string | null;
+    prev: string | null;
+  };
+  results: T[];
+}
+
+async function searchResource(resourceType: string, searchTerm: string): Promise<(Character | Location | Episode)[]> {
   try {
     const response = await fetch(`${BASE_URL}/${resourceType}/?name=${encodeURIComponent(searchTerm)}`);
     
@@ -17,9 +67,9 @@ async function searchResource(resourceType, searchTerm) {
       throw new Error(`Failed to fetch ${resourceType}: ${response.statusText}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as ApiResponse<Character | Location | Episode>;
     return data.results || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error searching ${resourceType}:`, error.message);
     return [];
   }
@@ -37,18 +87,18 @@ async function getAllCharacters() {
       throw new Error(`Failed to fetch charactes: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as ApiResponse<Character>;
     return data.results || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error searching characters:`, error.message);
     return [];
   }
 }
 
 
-app.get("/search", async (req, res) => {
-  const searchTerm = req.query.term;
-  const limitRaw = req.query.limit;
+app.get("/search", async (req: Request, res: Response) => {
+  const searchTerm = req.query.term as string;
+  const limitRaw = req.query.limit as string | undefined;
   
   if (!searchTerm) {
     return res.status(400).json({ 
@@ -74,9 +124,9 @@ app.get("/search", async (req, res) => {
     ]);
     
 
-    const results = [];
+    const results: SearchResult[] = [];
     
-    characters.forEach(character => {
+    (characters as Character[]).forEach(character => {
       results.push({
         name: character.name,
         type: "character",
@@ -84,7 +134,7 @@ app.get("/search", async (req, res) => {
       });
     });
     
-    locations.forEach(location => {
+    (locations as Location[]).forEach(location => {
       results.push({
         name: location.name,
         type: "location",
@@ -92,7 +142,7 @@ app.get("/search", async (req, res) => {
       });
     });
     
-    episodes.forEach(episode => {
+    (episodes as Episode[]).forEach(episode => {
       results.push({
         name: episode.name,
         type: "episode",
@@ -112,10 +162,10 @@ app.get("/search", async (req, res) => {
 });
 
 
-app.get("/top-pairs", async (req, res) => {
-  const minEpisodesRaw = req.query.min;
-  const maxEpisodesRaw = req.query.max;
-  const limitRaw = req.query.limit;
+app.get("/top-pairs", async (req: Request, res: Response) => {
+  const minEpisodesRaw = req.query.min as string | undefined;
+  const maxEpisodesRaw = req.query.max as string | undefined;
+  const limitRaw = req.query.limit as string | undefined;
 
   let minEpisodes = 0;
   let maxEpisodes = Infinity;
@@ -151,9 +201,9 @@ app.get("/top-pairs", async (req, res) => {
   try {
     const allCharacters = await getAllCharacters();
 
-    const charactersWithEpisodes = [];
+    const charactersWithEpisodes: { id: number; name: string; url: string; episodes: string[] }[] = [];
     
-    allCharacters.forEach(character => {
+    (allCharacters as Character[]).forEach((character: Character) => {
       charactersWithEpisodes.push({
         id: character.id,
         name: character.name,
@@ -162,7 +212,7 @@ app.get("/top-pairs", async (req, res) => {
       });
     });
 
-    const charactersPairs = [];
+    const charactersPairs: CharacterPair[] = [];
 
     charactersWithEpisodes.forEach(character1 => {
       charactersWithEpisodes.forEach(character2 => {
@@ -193,7 +243,7 @@ app.get("/top-pairs", async (req, res) => {
     
     res.json(limitedResults);
 
-  } catch(error) {
+  } catch(error: any) {
     console.error("Error in /top-pairs endpoint:", error.message, error.stack);
     res.status(500).json({
       error: "Internal server error"
